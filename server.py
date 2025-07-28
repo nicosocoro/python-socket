@@ -3,9 +3,12 @@ import os
 import signal
 import sys
 import argparse
+import app_args
+import socket_utils
 
-def cleanup_socket(unix_socket_path):
+def cleanup_unix_socket():
     """Remove socket file if it exists"""
+    unix_socket_path = socket_utils.SOCKET_PATH
     if os.path.exists(unix_socket_path):
         os.unlink(unix_socket_path)
         print(f"Removed existing socket: {unix_socket_path}")
@@ -41,33 +44,28 @@ Method not allowed"""
     finally:
         client_socket.close()
 
-unix_socket_path = "/tmp/local_server.sock"
-
 def build_tcp_socket():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind(("localhost", 8080))
     return s
 
 def build_unix_socket():
-    cleanup_socket(unix_socket_path)
+    cleanup_unix_socket()
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    s.bind(unix_socket_path)
+    s.bind(socket_utils.SOCKET_PATH)
     return s
 
 def main():
-    parser = argparse.ArgumentParser(description="Basic Socket server example")
-    parser.add_argument("--socket", required=True, choices=['tcp', 'unix'], help="Socket type")
-    args = parser.parse_args()
-
+    args = app_args.get_args()
     socket_type = args.socket
 
     try:
-        if socket_type == "tcp":
+        if socket_type == socket_utils.TCP:
             server_socket = build_tcp_socket()
-        elif socket_type == "unix":
+        elif socket_type == socket_utils.UNIX:
             server_socket = build_unix_socket()
         else:
-            raise Exception(f"Invalid socket type: {socket_type}. Must be 'tcp' or 'unix'")
+            raise Exception(f"Invalid socket type: {socket_type}. Must be '{socket_utils.TCP}' or '{socket_utils.UNIX}'")
         
         server_socket.listen(5)
         print(f"✅ Server running. File descriptor: {server_socket.fileno()}")
@@ -76,8 +74,8 @@ def main():
         def signal_handler(sig, frame):
             print('\n🛑 Shutting down server...')
             server_socket.close()
-            if socket_type == "unix":
-                cleanup_socket(unix_socket_path)
+            if socket_type == socket_utils.UNIX:
+                cleanup_unix_socket()
             sys.exit(0)
         
         signal.signal(signal.SIGINT, signal_handler)
@@ -86,7 +84,7 @@ def main():
         # Accept connections
         while True:
             client_socket, address = server_socket.accept()
-            if socket_type == "unix":
+            if socket_type == socket_utils.UNIX:
                 print(f"📨 New Unix domain socket connection")
             else:
                 print(f"📨 New TCP connection from: {address}")
@@ -96,7 +94,7 @@ def main():
         print(f"❌ Server error: {e}")
     finally:
         server_socket.close()
-        cleanup_socket(unix_socket_path)
+        cleanup_unix_socket()
 
 if __name__ == "__main__":
     main()

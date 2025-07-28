@@ -1,18 +1,22 @@
 import socket
-import argparse
+import app_args
+import socket_utils
+
+def set_socket_timeout(socket):
+    socket.settimeout(1)
 
 def build_unix_socket():
     def builder():
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.settimeout(1) 
-        s.connect("/tmp/local_server.sock")
+        set_socket_timeout(s)
+        s.connect(socket_utils.SOCKET_PATH)
         return s
     return build_socket(builder)
 
 def build_tcp_socket():
     def builder():
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1) 
+        set_socket_timeout(s)
         s.connect(("localhost", 8080))
         return s
     return build_socket(builder)
@@ -25,19 +29,21 @@ def build_socket(socket_builder):
         return None
 
 def get_socket(socket_type):
-    if socket_type == "tcp":
+    if socket_type == socket_utils.TCP:
         return build_tcp_socket()
-    if socket_type == "unix":
+    if socket_type == socket_utils.UNIX:
         return build_unix_socket()
     else:
-        raise Exception(f"Invalid socket type: {socket_type}. Must be 'tcp' or 'unix'")
+        raise Exception(f"Invalid socket type: {socket_type}. Must be '{socket_utils.TCP}' or '{socket_utils.UNIX}'")
 
-parser = argparse.ArgumentParser(description="Basic Socket client example")
-parser.add_argument("--socket", required=True, choices=['tcp', 'unix'], help="Socket type")
-args = parser.parse_args()
-print(f"arsgs:{args}")
-with get_socket(args.socket) as s:
-    if s:
-        s.send(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
-        response = s.recv(1024)
-        print(f"[+] Response: {response.decode()}")
+
+def main():
+    args = app_args.get_args()
+    with get_socket(args.socket) as s:
+        if s:
+            s.send(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            response = s.recv(1024)
+            print(f"[+] Response: {response.decode()}")
+
+if __name__ == "__main__":
+    main()
